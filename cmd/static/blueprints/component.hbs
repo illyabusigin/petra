@@ -1,0 +1,17 @@
+package {{package}}
+
+import (
+	"github/illyabusigin/petra"
+)
+
+type {{name}}Component struct {
+	*petra.Component
+	Timezone string
+}
+
+func New{{name}}(route *petra.Route) *{{name}}Component {
+	c := &{{name}}Component{}
+	c.Component = petra.NewComponent("{{name}}", route, c)
+
+	return c
+}

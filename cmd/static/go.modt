@@ -1,0 +1,7 @@
+module {{name}}
+
+go 1.17
+
+require (
+	github.com/illyabusigin/petra v0.0.1
+)

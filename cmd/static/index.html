@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>{{name}}</title>
+    <meta name="description" content="" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link integrity="" rel="stylesheet" href="{{rootURL}}assets/app.css" />
+  </head>
+  <body {{content-for "hot-reload-tag"}}>
+    {{content-for "body"}}
+    <script type="text/javascript" src="/live.js"></script>
+    {{content-for "hot-reload"}}
+  </body>
+</html>
