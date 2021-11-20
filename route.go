@@ -10,6 +10,8 @@ import (
 	"github.com/aymerick/raymond"
 	"github.com/jfyne/live"
 	"github.com/jfyne/live/page"
+	"github.com/mitchellh/hashstructure/v2"
+	"github.com/rs/xid"
 )
 
 // Route
@@ -28,6 +30,8 @@ type Route struct {
 
 	template *raymond.Template
 	handler  *eventHandler
+
+	components map[uint64]*page.Component
 }
 
 func (r *Route) Session(s live.SessionStore) {
@@ -51,7 +55,9 @@ func (r *Route) Validate() error {
 }
 
 func (r *Route) build() live.HandlerConfig {
+	fmt.Println("Build route", r)
 	return page.WithComponentMount(func(ctx context.Context, h *live.Handler, req *http.Request, s *live.Socket) (*page.Component, error) {
+
 		return page.NewComponent(r.name, h, s,
 			page.WithRegister(r.Register),
 			page.WithMount(r.mount()),
@@ -70,14 +76,15 @@ func (r *Route) Handler() (*live.Handler, error) {
 }
 
 func (r *Route) mount() page.MountHandler {
-	return func(ctx context.Context, cmp *page.Component, req *http.Request) error {
-		fmt.Println("Mount route")
-		if err := r.handler.registerHandlers(r.self, cmp); err != nil {
+	return func(ctx context.Context, route *page.Component, req *http.Request) error {
+		// route is a component and also has state
+		fmt.Println("Mount route", len(r.components), route.State, ctx)
+		if err := r.handler.registerHandlers(r.self, route); err != nil {
 			return fmt.Errorf("Failed to register event handlers: %w", err)
 		}
 		data, err := r.app.router.loadRouteData(r.name)
 		if err != nil {
-			fmt.Println("Eror loading template", err)
+			fmt.Println("Error loading template", err)
 
 			return fmt.Errorf("Failed to locate route template: %w", err)
 
@@ -85,13 +92,13 @@ func (r *Route) mount() page.MountHandler {
 
 		data, err = r.handler.processTemplate(data)
 		if err != nil {
-			fmt.Println("Eror processing template", err)
+			fmt.Println("Error processing template", err)
 			return fmt.Errorf("Failed to process route template: %w", err)
 		}
 
 		tmplt, err := raymond.Parse(string(data))
 		if err != nil {
-			fmt.Println("Eror parsing template", err)
+			fmt.Println("Error parsing template", err)
 
 			return fmt.Errorf("Failed to parse route template: %w", err)
 		}
@@ -105,16 +112,65 @@ func (r *Route) mount() page.MountHandler {
 
 			buf := bytes.Buffer{}
 			if err := c.Render(&buf, &c); err != nil {
-				return fmt.Sprintf("Error rendering component: %v")
+				return fmt.Sprintf("Error rendering component: %v", err)
 			}
 
 			return buf.String()
 		})
 
+		tmplt.RegisterHelper("avec", func(context interface{}, options *raymond.Options) string {
+			fmt.Println("Conteasdf")
+			return options.FnWith(context)
+		})
+
+		tmplt.RegisterHelper("render", func(identifier string, options *raymond.Options) raymond.SafeString {
+			intializer, ok := r.app.components[identifier]
+			if !ok {
+				fmt.Println("No component found for", identifier, r.app.components)
+				return ""
+			}
+
+			toHash := fmt.Sprintf("%#v %v", intializer, options.Hash())
+			hashID, err := hashstructure.Hash(toHash, hashstructure.FormatV2, &hashstructure.HashOptions{UseStringer: true})
+			if err != nil {
+				fmt.Println("ahash error:", err)
+			}
+
+			component, ok := r.components[hashID]
+
+			if !ok {
+				fmt.Printf("rendering new %v component: %v, hash: %v\n", identifier, toHash, hashID)
+				// Use the page.Init function to create a new component, register it and mount it.
+				component, err = page.Init(context.Background(), func() (*page.Component, error) {
+					// Each clock requires its own unique stable ID. Events for each clock can then find
+					// their own component.
+					child := intializer(options.Hash())
+					return child.Build(r, route)
+				})
+
+				if err != nil {
+					return ""
+				}
+			} else {
+				fmt.Println("Found cached component, yipee")
+			}
+
+			r.components[hashID] = component
+
+			buf := bytes.Buffer{}
+			if err := component.Render(&buf, component); err != nil {
+				fmt.Printf("Error rendering component: %v\n", err)
+				return ""
+			}
+
+			fmt.Println("rendeering compoennt", hashID)
+			return raymond.SafeString(buf.String())
+		})
+
 		r.template = tmplt
 
 		if r.Mount != nil {
-			if err := r.Mount(ctx, cmp, req); err != nil {
+			if err := r.Mount(ctx, route, req); err != nil {
 				return err
 			}
 		}
@@ -123,7 +179,7 @@ func (r *Route) mount() page.MountHandler {
 }
 
 func (r *Route) Render(w io.Writer, cmp *page.Component) error {
-
+	// render pass starts, generate unique ID
 	result, err := r.template.Exec(r.args(cmp))
 	if err != nil {
 		return err
@@ -144,10 +200,11 @@ func (r *Route) args(c *page.Component) map[string]interface{} {
 
 func NewRoute(name string, app *Application, self interface{}) *Route {
 	r := &Route{
-		name: name,
-		id:   app.nextID(),
-		app:  app,
-		self: self,
+		name:       name,
+		id:         xid.New().String(),
+		app:        app,
+		self:       self,
+		components: map[uint64]*page.Component{},
 	}
 	r.handler = newEventHandler(r.name)
 

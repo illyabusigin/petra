@@ -51,7 +51,7 @@ func (r *GenerateCmd) Run(ctx *Context) error {
 		return err
 	}
 
-	fmt.Printf("Generate %v %v:\n", r.Blueprint, r.Name)
+	fmt.Printf("Generated %v %v:\n", r.Blueprint, r.Name)
 
 	src := filepath.Join("static/blueprints", r.Blueprint+".hbs")
 

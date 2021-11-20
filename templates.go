@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/aymerick/raymond"
+	"github.com/iancoleman/strcase"
 )
 
 var (
@@ -116,6 +117,8 @@ func (r *Router) processComponentTemplate(fs embed.FS, path string) error {
 
 	name := filepath.Base(path)
 	name = strings.TrimSuffix(name, ".hbs")
+	// name = strcase.ToCamel(name) + "Component"
+
 	r.components[name] = tmplt
 	r.componentData[name] = string(data)
 
@@ -164,6 +167,10 @@ func (r *Router) loadRouteData(route string) (string, error) {
 }
 
 func (r *Router) loadComponentData(component string) (string, error) {
+	component = strings.TrimSuffix(component, "Component")
+	component = strcase.ToKebab(component)
+	component = strings.ToLower(component)
+
 	t, ok := r.componentData[component]
 	if !ok {
 		return "", ErrTemplateNotFound

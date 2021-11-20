@@ -23,6 +23,8 @@ type Application struct {
 	hotReload bool
 
 	session live.SessionStore
+
+	components map[string]ComponentInitializer
 }
 
 func (a *Application) init(opts ...Option) {
@@ -60,4 +62,8 @@ func (a *Application) nextID() string {
 	a.id += 1
 
 	return fmt.Sprintf("petra%v", id)
+}
+
+func (a *Application) RegisterComponents(name string, init ComponentInitializer) {
+	a.components[name] = init
 }
