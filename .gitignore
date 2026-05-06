@@ -1,22 +1,45 @@
-# Binaries for programs and plugins
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Go build output
+bin/
+build/
+dist/
+tmp/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
-# Test binary, built with `go test -c`
 *.test
 
-# Output of the go coverage tool, specifically when used with LiteIDE
+# Go test and coverage output
 *.out
+coverage.*
+profile.*
+cpu.out
+mem.out
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Go workspace and tool scratch
+.air/
 
-node_modules
+# Node asset tooling
+node_modules/
 
-# OS X
-/**/.DS_Store
+# Local environment files
+.env
+.env.*
+!.env.example
 
-/**/tmp
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
