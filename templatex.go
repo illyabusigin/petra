@@ -392,7 +392,7 @@ func parseFS(files fs.FS, dir, includeDir, layout string, pageExtensions []strin
 	return templates, componentTemplate, graph, nil
 }
 
-// templateInfo contains all template information neccessary to parse a
+// templateInfo contains all template information necessary to parse a
 // final template with its dependencies (layout templates, include templates)
 // It also contains an identifier for the resulting template to execute
 type templateInfo struct {

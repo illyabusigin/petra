@@ -2,6 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/illyabusigin/petra.svg)](https://pkg.go.dev/github.com/illyabusigin/petra)
 [![CI](https://github.com/illyabusigin/petra/actions/workflows/ci.yml/badge.svg)](https://github.com/illyabusigin/petra/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/illyabusigin/petra)](https://goreportcard.com/report/github.com/illyabusigin/petra)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Petra is a small wrapper around Go's `html/template` package for sites and server-rendered product surfaces.
