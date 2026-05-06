@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ .Title }}</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">Petra errors</a>
+      <nav class="nav" aria-label="Debug routes">
+        {{ range .Nav }}
+          <a href="{{ .Path }}" class="{{ if eq $.CurrentPath .Path }}active{{ end }}">{{ .Label }}</a>
+        {{ end }}
+      </nav>
+    </header>
+    {{ block "content" . }}{{ end }}
+  </body>
+</html>

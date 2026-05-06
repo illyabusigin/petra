@@ -1,0 +1,13 @@
+{{ define "content" }}
+  <main>
+    <section class="panel">
+      <p class="eyebrow">Component failure</p>
+      <h1>This page fails inside a component-style call.</h1>
+      <p>
+        Petra's component wrapper adds a template stack frame so the debug page
+        can point at the component instead of only showing the parent page.
+      </p>
+      {{ ExplodingCard . }}
+    </section>
+  </main>
+{{ end }}

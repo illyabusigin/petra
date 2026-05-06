@@ -1,0 +1,18 @@
+{{ define "content" }}
+  <section class="hero compact">
+    <p class="eyebrow">About</p>
+    <h1>What this example is meant to show.</h1>
+    <p class="lede">
+      Petra can sit inside a normal Go web app without a frontend framework. Use embedded assets in production,
+      disk-backed templates in development, and the same controllers in both modes.
+    </p>
+  </section>
+
+  <section class="notes">
+    <h2>Development path</h2>
+    <p>Run with <code>go run . -dev</code>. Template edits send <code>reload</code>; static edits send <code>reload_assets</code>.</p>
+
+    <h2>Production path</h2>
+    <p>Run without <code>-dev</code>. Templates and static assets come from <code>embed.FS</code>.</p>
+  </section>
+{{ end }}

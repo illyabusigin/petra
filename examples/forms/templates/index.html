@@ -1,0 +1,36 @@
+{{ define "content" }}
+  <main>
+    <p><strong>Forms example</strong></p>
+    <h1>Server-rendered form flow.</h1>
+    <p>
+      This example keeps JavaScript out. The server handles the GET, parses the
+      POST, validates fields, and re-renders the same template with errors.
+    </p>
+
+    {{ if .Form.Submitted }}
+      <p class="success">Thanks, {{ .Form.Name }}. The server accepted the form.</p>
+    {{ end }}
+
+    <form method="post" action="/">
+      <label>
+        Name
+        <input name="name" value="{{ .Form.Name }}" autocomplete="name" />
+        {{ with index .Form.Errors "name" }}<span class="error">{{ . }}</span>{{ end }}
+      </label>
+
+      <label>
+        Email
+        <input name="email" type="email" value="{{ .Form.Email }}" autocomplete="email" />
+        {{ with index .Form.Errors "email" }}<span class="error">{{ . }}</span>{{ end }}
+      </label>
+
+      <label>
+        Message
+        <textarea name="message" rows="5">{{ .Form.Message }}</textarea>
+        {{ with index .Form.Errors "message" }}<span class="error">{{ . }}</span>{{ end }}
+      </label>
+
+      <button type="submit">Submit</button>
+    </form>
+  </main>
+{{ end }}

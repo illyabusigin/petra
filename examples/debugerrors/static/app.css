@@ -1,0 +1,97 @@
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: #f7f5f0;
+  color: #111827;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #d9d3c7;
+  background: #fff;
+  padding: 14px clamp(16px, 4vw, 40px);
+}
+
+.brand {
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nav a {
+  border: 1px solid #d9d3c7;
+  border-radius: 6px;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.nav a.active {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+}
+
+main {
+  width: min(860px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 56px 0;
+}
+
+.panel {
+  border: 1px solid #d9d3c7;
+  border-radius: 8px;
+  background: #fff;
+  padding: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: #df5b2f;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+h1 {
+  max-width: 720px;
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1.05;
+}
+
+p {
+  max-width: 680px;
+  color: #4b5563;
+  font-size: 1.04rem;
+  line-height: 1.7;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.button {
+  min-height: 44px;
+  border-radius: 6px;
+  background: #111827;
+  padding: 10px 14px;
+  color: #fff;
+  font-weight: 800;
+  text-decoration: none;
+}

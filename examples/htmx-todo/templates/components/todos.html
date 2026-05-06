@@ -1,0 +1,39 @@
+{{ define "Todos" }}
+  <section id="todos" class="todos" data-total="{{ .Total }}" data-open="{{ .OpenCount }}">
+    <div class="todo-header">
+      <h2>Todos</h2>
+      <p>{{ .OpenCount }} open / {{ .Total }} total</p>
+    </div>
+
+    {{ if .Todos }}
+      <ul class="todo-list">
+        {{ range .Todos }}
+          <li class="todo{{ if .Done }} completed{{ end }}">
+            <button
+              type="button"
+              class="todo-state secondary"
+              aria-pressed="{{ .Done }}"
+              hx-patch="/todos/{{ .ID }}/toggle"
+              hx-target="#todos"
+              hx-swap="outerHTML"
+            >
+              {{ if .Done }}Done{{ else }}Open{{ end }}
+            </button>
+            <span class="todo-title">{{ .Title }}</span>
+            <button
+              type="button"
+              class="secondary"
+              hx-delete="/todos/{{ .ID }}"
+              hx-target="#todos"
+              hx-swap="outerHTML"
+            >
+              Remove
+            </button>
+          </li>
+        {{ end }}
+      </ul>
+    {{ else }}
+      <p class="empty">No todos yet.</p>
+    {{ end }}
+  </section>
+{{ end }}

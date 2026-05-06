@@ -1,0 +1,20 @@
+{{ define "content" }}
+  <main>
+    <p><strong>Alpine example</strong></p>
+    <h1>Petra renders the page. Alpine opens the panel.</h1>
+    <p>
+      This example is intentionally small: no router, no Tailwind, no form
+      handling. It only shows bundling Alpine and using it as a progressive
+      enhancement on server-rendered HTML.
+    </p>
+
+    <section x-data="disclosure()">
+      <button type="button" @click="toggle()" :aria-expanded="open.toString()">
+        Toggle details
+      </button>
+      <div class="panel" x-cloak x-show="open">
+        Alpine controls this panel. The rest of the page came from Petra.
+      </div>
+    </section>
+  </main>
+{{ end }}

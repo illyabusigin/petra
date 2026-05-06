@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ .Title }}</title>
+    <script type="module" src="/static/app.js"></script>
+    <style>
+      [x-cloak] { display: none !important; }
+      body { margin: 0; min-height: 100vh; font-family: ui-sans-serif, system-ui, sans-serif; background: #f7f5f0; color: #111827; }
+      main { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 72px 0; }
+      button { min-height: 44px; border: 1px solid #d9d3c7; border-radius: 6px; background: white; padding: 8px 12px; font-weight: 700; }
+      .panel { margin-top: 16px; border: 1px solid #d9d3c7; border-radius: 8px; background: white; padding: 18px; }
+    </style>
+  </head>
+  <body>
+    {{ block "content" . }}{{ end }}
+    {{ if .Dev }}
+      <script src="/_reload/client.js"></script>
+    {{ end }}
+  </body>
+</html>

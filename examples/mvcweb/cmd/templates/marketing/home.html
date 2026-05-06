@@ -1,0 +1,32 @@
+{{ define "content" }}
+<section class="hero">
+  <p class="eyebrow">Petra example</p>
+  <h1>A small MVC web app using Petra.</h1>
+  <p class="lede">
+    This example keeps the application shape familiar: a command starts the
+    server, controllers own routes, and templates live in a nested tree with
+    layouts and components.
+  </p>
+</section>
+
+<section class="grid">
+  <article>
+    <h2>Model</h2>
+    <p>
+      Page data is plain Go structs. The controller builds the context passed to
+      Petra.
+    </p>
+  </article>
+  <article>
+    <h2>View</h2>
+    <p>
+      Templates use one root layout, shared components, and page-specific
+      content blocks.
+    </p>
+  </article>
+  <article>
+    <h2>Controller</h2>
+    <p>Each controller owns its routes and calls one shared render helper.</p>
+  </article>
+</section>
+{{ end }}

@@ -1,0 +1,14 @@
+{
+  "name": "petra-tailwind-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "assets:build": "vite build",
+    "assets:watch": "vite build --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.2.4",
+    "tailwindcss": "4.2.4",
+    "vite": "8.0.10"
+  }
+}

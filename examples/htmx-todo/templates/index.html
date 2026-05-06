@@ -1,0 +1,31 @@
+{{ define "content" }}
+  <main>
+    <section class="panel">
+      <p class="eyebrow">HTMX todo</p>
+      <h1>Petra renders HTML. HTMX swaps the todo list.</h1>
+      <p>
+        The form posts to Go. HTMX receives a rendered Petra component and
+        replaces only the list below.
+      </p>
+
+      <form
+        id="todo-form"
+        class="todo-form"
+        method="post"
+        action="/todos"
+        hx-post="/todos"
+        hx-target="#todos"
+        hx-swap="outerHTML"
+        hx-on::after-request="if(event.detail.successful) this.reset()"
+      >
+        <input name="title" placeholder="Add a todo" autocomplete="off" />
+        <button type="submit">Add</button>
+        <p id="todo-form-errors" class="form-errors" role="alert">
+          {{ with .FormError }}<span class="error">{{ . }}</span>{{ end }}
+        </p>
+      </form>
+    </section>
+
+    {{ Todos . }}
+  </main>
+{{ end }}

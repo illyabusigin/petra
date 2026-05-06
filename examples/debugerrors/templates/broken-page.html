@@ -1,0 +1,13 @@
+{{ define "content" }}
+  <main>
+    <section class="panel">
+      <p class="eyebrow">Page failure</p>
+      <h1>This page raises an execution error.</h1>
+      <p>
+        This text is buffered before it reaches the browser, so Petra can still
+        replace the response with the debug page below.
+      </p>
+      {{ explode "page data lookup" }}
+    </section>
+  </main>
+{{ end }}

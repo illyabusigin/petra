@@ -1,0 +1,10 @@
+{{ define "nav" }}
+  <header class="site-header">
+    <a class="brand" href="/">Petra MVC</a>
+    <nav class="nav" aria-label="Main navigation">
+      {{ range .Nav }}
+        <a {{ attrs "href" .Path }} class="nav-link{{ if eq $.CurrentPath .Path }} active{{ end }}">{{ .Label }}</a>
+      {{ end }}
+    </nav>
+  </header>
+{{ end }}
