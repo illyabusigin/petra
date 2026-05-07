@@ -5,13 +5,75 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/illyabusigin/petra)](https://goreportcard.com/report/github.com/illyabusigin/petra)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Petra is a small wrapper around Go's `html/template` package for sites and server-rendered product surfaces.
+Petra is a small layer around Go server-rendered HTML.
 
-It adds three things:
+It keeps `html/template`, `net/http`, and normal Go handlers at the center of
+the app. The point is not to hide Go. The point is to stop every web project
+from rebuilding the same thin layer around templates, assets, development
+reloads, and template errors.
 
-- Layout discovery for a `templates/` tree.
-- Component-style template calls through `tmplfunc`, so `{{Header .}}` can call a `{{define "Header"}}` template.
-- A few site helpers for Markdown, SVGs, static files, and development hot reload.
+Raw Go templates work well, but larger sites tend to grow the same private
+conventions:
+
+- every handler decides how to execute templates;
+- layouts and partials become naming conventions no one wrote down;
+- full pages and HTMX fragments drift into different rendering paths;
+- static asset URLs get their own helper code;
+- template errors are harder to read than they need to be;
+- live reload is absent or bolted on per app.
+
+Petra gives those pieces one shape.
+
+## What Petra gives you
+
+Petra makes the rendering boundary explicit. A controller can render a full
+page, execute a fragment, or show a development template error without every
+handler knowing those mechanics.
+
+It also makes partials feel like server-side components. A template can call
+`{{ PageHeader . }}` or `{{ AnswerCard . }}` instead of reaching into another
+file by path. That is still Go templates. There is no client runtime behind it.
+
+Petra separates production and development concerns. Production can use
+embedded templates and static files. Development can read from disk, serve
+unhashed local files, reload the browser when templates or assets change, and
+show structured template errors while the previous working template set stays
+active.
+
+The package includes:
+
+- layout discovery for a `templates/` tree;
+- component-style template calls through `tmplfunc`;
+- page and fragment execution helpers;
+- development debug pages and hot reload;
+- static file serving for local development and embedded production builds;
+- asset helpers for content-hashed production URLs;
+- plugins for Markdown, SVGs, and trusted HTML helpers.
+
+## When Petra fits
+
+Use Petra when a Go web app has enough templates that rendering deserves a real
+boundary, but not so much client-side state that the server has stopped owning
+the page.
+
+It is a good fit for product sites, admin tools, documentation-style apps, HTMX
+interfaces, forms, and marketing sites that still want Go to render the first
+view.
+
+It is probably not the right tool if all HTML comes from a frontend build, or if
+the server only returns JSON.
+
+## Trade-offs
+
+Petra is a convention, not a neutral primitive. Template names become part of
+the app's internal API. Layouts, page blocks, and component names need the same
+care as handler methods. Moving an older app to Petra can create template churn,
+especially when the app uses full-page templates or path-based partial calls
+everywhere.
+
+Petra does not replace application architecture. You still need clear
+controllers, view models, cache rules, error handling, and routing. Petra gives
+the template and asset layer a common set of tools.
 
 ## Install
 
