@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.0.3 - 2026-05-07
+
+- Updates CI and all Go modules to Go 1.26.3 to pick up `html/template` XSS fixes for GO-2026-4982 and GO-2026-4980.
+
 ## v0.0.2 - 2026-05-06
 
 Initial public release candidate for `github.com/illyabusigin/petra`.
