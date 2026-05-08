@@ -1,130 +1,60 @@
 # hashed static assets and production cache headers
 
-Last reviewed: 2026-05-01.
+Last reviewed: 2026-05-08.
 
-Status: first pass implemented in this repository.
+Status: implemented in `assets.go` and covered by `assets_test.go`.
 
-This plan covers production asset URLs and cache headers for Petra. It was written after reading the current Petra static server, an application using Petra, `statigz`, `andybalholm/brotli`, and `github.com/benbjohnson/hashfs@v0.2.2`.
+This document describes Petra's implemented hashed asset layer. Earlier design
+notes in this file have been folded into the current API contract, serving
+behavior, and rationale.
 
-External references checked:
+## what is implemented
 
-- [`hashfs` README at `v0.2.2`](https://github.com/benbjohnson/hashfs/blob/v0.2.2/README.md)
-- [`hashfs.go` at `v0.2.2`](https://github.com/benbjohnson/hashfs/blob/v0.2.2/hashfs.go)
+Petra has an opt-in `Assets` type for applications that want templates to emit
+cache-safe asset URLs:
 
-## decision
+- `StaticFS` remains the simple embedded static file server.
+- `NewStaticWithOptions` remains the development static server with hot reload.
+- `NewAssets` creates a template URL helper and an HTTP handler.
+- Production URLs include a full SHA-256 content hash in the filename.
+- Verified hashed production requests get immutable cache headers.
+- Raw production requests still serve, but use revalidation.
+- Development URLs stay readable and can include an mtime query string.
+- The handler keeps Petra's `statigz` path for startup-time Brotli/gzip
+  compression.
 
-Add this to Petra as an opt-in asset layer. Do not change the behavior of `StaticFS` in place.
+Existing Petra users do not get hashed URLs or year-long browser caches unless
+they choose `Assets` and call the helper from templates.
 
-The first implementation should:
-
-- Keep `petra.StaticFS` working exactly as it works today.
-- Add a new Petra asset API that can generate content-hashed URLs and serve those URLs with immutable cache headers.
-- Use `hashfs` for SHA-256 filename formatting and validation.
-- Keep Petra's current `statigz` production serving path for Brotli/gzip and startup-time compression.
-- Let applications adopt the helper progressively, one asset reference at a time.
-
-This is a progressive enhancement at the API level. Existing Petra users should not get hashed URLs or year-long browser caches unless they ask for that behavior.
-
-It is "all-in" per asset reference. If a template keeps using `/static/app.css`, that request should still work, but it should not get immutable caching. The immutable policy belongs to URLs that include a verified content hash.
-
-## facts from the current code
-
-Petra production static serving currently goes through `StaticFS`:
-
-- `StaticFS` builds a `statigz.FileServer`.
-- It enables `brotli.AddEncoding`.
-- It enables `statigz.EncodeOnInit`.
-- It uses the configured strip prefix as the embedded filesystem prefix.
-- It serves through `http.StripPrefix`.
-
-That code lives in `static.go`.
-
-`statigz` does useful work that we should not throw away:
-
-- It indexes the filesystem when the server is built.
-- It precompresses eligible files at startup when `EncodeOnInit` is set.
-- It skips formats that are already compressed, including `.png` and `.webp`.
-- It chooses Brotli or gzip based on `Accept-Encoding`.
-- It sets `Vary: Accept-Encoding`.
-- It sets `ETag` and handles `If-None-Match`.
-
-The current gap is cache policy. The responses have validators, but they do not have `Cache-Control`.
-
-The app this plan was written for uses embedded production assets:
-
-- `services/web/cmd/web.go` embeds `templates/*`, nested template folders, and `static/*`.
-- Production calls `tmpl.ParseFS(webFS, "templates")`.
-- Production mounts `/static/*` with `petra.StaticFS(webFS, "/static/")`.
-- Development uses `ParseDir`, `NewStaticWithOptions`, filesystem assets, and hot reload.
-
-The current app also has asset URLs in two shapes:
-
-- Literal template paths, such as `/static/app.css`, `/static/app.js`, `/static/brandmark.svg`, and home hero images.
-- Controller data paths, such as `Product.HomeImage`, `ArchiveEntry.Image`, and OpenGraph images.
-
-That second shape matters. Hashing only the literal CSS/JS tags would leave much of the asset traffic on raw URLs.
-
-## facts from `hashfs@v0.2.2`
-
-`hashfs` is a small package with no third-party dependencies. Its module target is Go 1.16.
-
-The released `v0.2.2` API does three things we care about:
-
-- `hashfs.NewFS(fsys)` wraps an `fs.FS`.
-- `(*hashfs.FS).HashName(name)` reads a file, computes a SHA-256 hash, and formats a filename with the full 64-character hex hash before the first dot in the basename. For example, `x.tar.gz` becomes `x-<hash>.tar.gz`.
-- `hashfs.ParseName(name)` splits a hashed filename back into the base path and hash when the name contains `-[0-9a-f]{64}`.
-
-It also has a `hashfs.FileServer`, but Petra should not use that server in the first pass.
-
-Reasons:
-
-- `hashfs.FileServer` is intentionally simplified. Its own comment says it removes directory canonicalization, `index.html` defaulting, precondition checks, and content range headers.
-- It does not do Brotli or gzip.
-- `hashfs.FS` exposes `Open`; it is not a `fs.ReadDirFS`, so it is not a drop-in input to Petra's current `statigz.FileServer` call.
-- Wrapping it in a Brotli middleware would usually compress on the request path.
-- Petra already has a production static path that precompresses compressible assets once at startup.
-
-Use `hashfs` as the hash naming and validation library. Keep Petra's static server responsible for bytes on the wire.
-
-## not the plan
-
-Do not replace `petra.StaticFS` with `hashfs.FileServer`.
-
-Do not add dynamic Brotli middleware as the primary direct-serving path. Dynamic compression is acceptable behind a CDN that caches the compressed response, but Petra's current direct-serving path is better for this repository because it avoids per-request compression for CSS and JavaScript.
-
-Do not make every Petra app use asset helpers. Some users may want plain embedded files, short-lived assets, or a CDN-managed build pipeline.
-
-Do not make Petra a bundler or manifest generator. The hash comes from file contents in the Go filesystem. JavaScript and CSS build steps stay in the application.
-
-## proposed public API
-
-Add a new type rather than changing `StaticFS`:
+## public API
 
 ```go
 type AssetOptions struct {
-	// Files is the embedded or virtual filesystem that contains production assets.
+	// Files is the embedded or virtual filesystem containing the asset tree.
 	Files fs.ReadDirFS
 
-	// Root is the asset root inside Files. For many apps this is "static".
+	// Root is the asset root inside Files. When empty, Files is used as-is.
 	Root string
 
-	// Prefix is the URL prefix. For many apps this is "/static/".
+	// Prefix is the request path prefix used for generated URLs. When empty,
+	// "/" is used.
 	Prefix string
 
-	// Dev switches URL generation to development behavior.
+	// Dev switches URL generation and cache headers to development behavior.
 	Dev bool
 
-	// DevDir is optional. When set, development URLs can include an mtime query
-	// string for hard-refresh cache busting.
+	// DevDir is the local filesystem directory for development assets. When
+	// set, generated dev URLs include an mtime query string.
 	DevDir string
 
-	// CacheControlHashed overrides the immutable hashed response policy.
+	// CacheControlHashed overrides the cache policy for verified hashed asset
+	// URLs.
 	CacheControlHashed string
 
-	// CacheControlUnhashed overrides the raw-path production policy.
+	// CacheControlUnhashed overrides the cache policy for raw asset URLs.
 	CacheControlUnhashed string
 
-	// CacheControlDev overrides the development policy.
+	// CacheControlDev overrides the cache policy when Dev is true.
 	CacheControlDev string
 }
 
@@ -133,14 +63,24 @@ type Assets struct {
 }
 
 func NewAssets(opts AssetOptions) (*Assets, error)
-
 func (a *Assets) Handler() http.Handler
 func (a *Assets) URL(name string) (string, error)
 ```
 
-`URL` should return `(string, error)` so templates fail loudly when an asset path is wrong:
+`URL` returns `(string, error)` so template mistakes fail during execution:
 
 ```go
+assets, err := petra.NewAssets(petra.AssetOptions{
+	Files:  webFS,
+	Root:   "static",
+	Prefix: "/static/",
+	Dev:    dev,
+	DevDir: "./cmd/static",
+})
+if err != nil {
+	return err
+}
+
 tmpl := petra.NewWithOptions(petra.Options{
 	FuncMap: template.FuncMap{
 		"Asset": assets.URL,
@@ -156,53 +96,7 @@ Template usage:
 <img src="{{ Asset "hero/product-archive.webp" }}" alt="">
 ```
 
-Accepted input forms:
-
-- `app.css`
-- `hero/product-archive.webp`
-- `/static/app.css`
-
-Rejected input forms:
-
-- empty path
-- paths that escape the asset root after cleaning
-- absolute `http://` or `https://` URLs
-
-External URLs should stay outside this helper. That keeps the trust boundary clear.
-
-## serving behavior
-
-The production handler should wrap a `statigz.FileServer` rather than replacing it.
-
-Request handling:
-
-1. Accept the incoming request under `Prefix`.
-2. Normalize the asset-relative request path with `path.Clean`.
-3. Parse the normalized path with `hashfs.ParseName`.
-4. If no hash is present, serve the raw file through `statigz` and set the raw-path cache policy.
-5. If a hash is present, compute the expected hash name for the base file.
-6. If the requested hash does not match the expected hash, return `404`.
-7. If the hash matches, rewrite the request path to the base asset path and serve through `statigz`.
-8. Set the hashed cache policy before calling the inner handler.
-
-Default cache policies:
-
-```text
-hashed production URL:
-  Cache-Control: public, max-age=31536000, immutable
-
-raw production URL:
-  Cache-Control: no-cache
-
-development URL:
-  Cache-Control: no-store
-```
-
-`no-cache` on raw production URLs means the browser can store the response but must revalidate before reuse. That matches the fact that raw URLs can change without the URL changing.
-
-`immutable` only appears after Petra has verified the hash. A typo such as `/static/app-0000....css` should not fall back to `/static/app.css`.
-
-`statigz` should continue to set `Vary`, `Content-Encoding`, `Content-Type`, `Content-Length`, and `ETag`. In the first pass, Petra should not fight `statigz` over `ETag`. The immutable URL makes the validator secondary.
+The helper is just a `FuncMap` entry. It is not a Petra plugin.
 
 ## URL generation
 
@@ -218,254 +112,236 @@ In development:
 Asset("app.css") -> /static/app.css
 ```
 
-If `DevDir` is set, development can keep the current hard-refresh behavior:
+When `DevDir` is set, Petra checks the local development file and includes its
+mtime in base 36:
 
 ```text
-Asset("app.css") -> /static/app.css?v=<mtime-base36>
+Asset("app.css") -> /static/app.css?v=<mtime>
 ```
 
-The query string should not be used in production. Production cache busting should come from the filename.
+Production URLs are path-only. Query-string cache busting is only for
+development.
 
-## how this fits Petra's existing APIs
+Accepted input forms:
 
-`StaticFS` remains the simple embedded static server:
+- `app.css`
+- `hero/product-archive.webp`
+- `/static/app.css`, when `Prefix` is `/static/`
+
+Rejected input forms:
+
+- empty paths
+- paths with query strings or fragments
+- paths that escape the asset root after cleaning
+- absolute URLs, including protocol-relative URLs
+- absolute local paths outside the configured `Prefix`
+- missing files
+- directories
+
+External URLs stay outside this helper. That keeps the trust boundary clear:
+`Asset` is for local files in the configured asset filesystem.
+
+## handler behavior
+
+`Assets.Handler()` serves requests under `Prefix`.
+
+Production behavior:
+
+- Raw requests such as `/static/app.css` serve the file with
+  `Cache-Control: no-cache`.
+- Hashed requests are parsed with `hashfs.ParseName`.
+- For a hashed request, Petra computes the expected hash name for the base file.
+- If the requested hash matches, Petra rewrites the request to the base file and
+  serves it with `Cache-Control: public, max-age=31536000, immutable`.
+- If the hash does not match, Petra returns `404`.
+
+Development behavior:
+
+- Requests are served with `Cache-Control: no-store`.
+- The handler serves the configured `Files` filesystem. `DevDir` is used for
+  mtime URL generation, not for serving bytes.
+- If the app needs disk serving, file watching, and browser reload messages,
+  mount `NewStaticWithOptions` in development instead.
+
+Custom cache policies can override the three defaults:
+
+```text
+hashed production URL: Cache-Control: public, max-age=31536000, immutable
+raw production URL:    Cache-Control: no-cache
+development URL:       Cache-Control: no-store
+```
+
+The immutable policy only appears after Petra verifies the hash. A typo such as
+`/static/app-0000....css` does not fall back to `/static/app.css`.
+
+## how it fits Petra's other static APIs
+
+Use `StaticFS` when the application wants a small embedded static server without
+template URL rewriting:
 
 ```go
-r.Handle("/static/*", petra.StaticFS(webFS, "/static/"))
+r.Handle("/static/", petra.StaticFS(webFS, "/static/"))
 ```
 
-The new API is for callers who want cache-safe asset URLs:
+Use `Assets` for templates that generate content-hashed URLs:
 
 ```go
 assets, err := petra.NewAssets(petra.AssetOptions{
 	Files:  webFS,
 	Root:   "static",
 	Prefix: "/static/",
-	Dev:    w.Dev,
-	DevDir: filepath.Join(w.RootDir, "cmd", "static"),
+	Dev:    dev,
+	DevDir: filepath.Join(rootDir, "static"),
 })
 if err != nil {
-	return nil, err
+	return err
 }
 
-tmpl := petra.NewWithOptions(petra.Options{
-	IncludeDir: "components",
-	FuncMap: template.FuncMap{
-		"Asset": assets.URL,
-	},
-	Plugins: plugins,
-})
-
-if w.Dev {
-	r.Handle("/static/*", static)
+if dev {
+	static := petra.NewStaticWithOptions(petra.StaticOptions{
+		Socket:      hotReload.Socket(),
+		Folder:      filepath.Join(rootDir, "static"),
+		StripPrefix: "/static/",
+	})
+	defer static.Close()
+	r.Handle("/static/", static)
 } else {
-	r.Handle("/static/*", assets.Handler())
+	r.Handle("/static/", assets.Handler())
 }
 ```
 
-This keeps the development watcher path intact. The first implementation can make `Assets.Handler()` production-only and return the existing dev static handler from the application.
+That split keeps the development watcher path intact while production uses the
+hashed asset handler. If an app does not need static hot reload, it can mount
+`assets.Handler()` in development too; dev responses use `no-store`.
 
-A later pass can add a dev handler constructor if the pattern repeats across examples.
+`examples/tailwind` shows the production and development wiring.
 
-## adoption model
+## implementation details
 
-This should be progressive.
+`NewAssets` requires an `fs.ReadDirFS`. If `Root` is set, Petra creates an
+asset-relative filesystem with `fs.Sub`. Public asset names are relative to that
+root, so templates use `app.css`, not `static/app.css`.
 
-Existing Petra users:
+`Prefix` is normalized to a leading and trailing slash. An empty prefix becomes
+`/`.
 
-- `StaticFS` keeps working.
-- `NewStaticWithOptions` keeps working.
-- Templates with hard-coded `/static/...` keep working.
-- No one gets year-long caching by surprise.
+Path normalization uses `path`, not `filepath`, because these are URL and
+`fs.FS` paths. Names are cleaned before hash calculation and before serving.
 
-New or migrated users:
+Production hash names come from `github.com/benbjohnson/hashfs@v0.2.2`.
+`hashfs.HashName` reads the file and formats the full 64-character SHA-256 hash
+before the first dot in the basename. For example, `x.tar.gz` becomes
+`x-<hash>.tar.gz`.
 
-- Add `Assets`.
-- Add the `Asset` template function.
-- Replace local static URLs with `{{ Asset "..." }}`.
-- Use `Assets.Handler()` in production.
+The handler does not use `hashfs.FileServer`. Petra wraps a
+`statigz.FileServer` instead, with `brotli.AddEncoding` and
+`statigz.EncodeOnInit`. That preserves startup-time precompression, Brotli/gzip
+content negotiation, `Vary: Accept-Encoding`, `ETag`, `If-None-Match`, and
+`HEAD` handling.
 
-The benefit appears only where the asset helper is used. That is the right trade-off. A partial migration is safe, but it is easy to see from source review which URLs are still raw.
+When serving a verified hashed request, Petra clones the request and rewrites
+the cloned URL path to the unhashed target before calling `statigz`. The
+original request is left alone for outer middleware.
 
-## application adoption plan
+Petra sets `Cache-Control` before calling the inner static server. The current
+`statigz` handler does not overwrite that header.
 
-Applications should adopt this in stages.
+## migration notes
 
-### stage 1: Petra package
+Adoption is progressive. Existing hard-coded `/static/...` URLs keep working,
+but they do not get immutable caching. The benefit appears only where templates
+or view data call `Asset`.
 
-Add the Petra API and tests without changing the web app.
+For literal template assets, replace local static paths with helper calls:
 
-Files expected:
+```gotemplate
+<link rel="stylesheet" href="{{ Asset "app.css" }}">
+```
 
-- `assets.go`
-- `assets_test.go`
-- `docs/design/hashed-static-assets.md`
-- `README.md`
-- one Petra example app update, probably `examples/tailwind`
-
-Add `github.com/benbjohnson/hashfs v0.2.2` to `go.mod`.
-
-### stage 2: literal template assets
-
-Update literal asset tags:
-
-- `layout.html`: favicon, apple touch icon, CSS, JavaScript.
-- `marketing/home.html`: hero image stack.
-- `marketing/archive.html`: archive hero image.
-- `components/archive_card.html`: card images, if the backing data stays local.
-
-The layout CSS line should lose `.AssetVersion`. The asset helper replaces it.
-
-### stage 3: controller data assets
-
-The controllers currently put local static paths into data structs:
-
-- `Product.HomeImage`
-- `Product.OGImage`
-- `SelectedWorkItem.HomeImage`
-- `ArchiveEntry.Image`
-- `ArchiveEntry.OGImage`
-- `OpenGraph.Image.URL`
-
-There are two reasonable migration paths:
-
-1. Store asset-relative names in data, such as `work/contract-iq-work.webp`, and call `{{ Asset .HomeImage }}` in templates.
-2. Keep `/static/...` paths in data and run them through a controller helper before rendering.
-
-Prefer option 1 for new or edited data. It makes local assets explicit and prevents accidentally passing an external URL to `Asset`.
-
-OpenGraph needs a separate application helper because those URLs are absolute:
+For controller-provided asset names, prefer storing asset-relative names in the
+view model:
 
 ```go
-func (e *Env) PublicAssetURL(name string) (string, error) {
-	p, err := e.Assets.URL(name)
+Product{HomeImage: "work/contract-iq-work.webp"}
+```
+
+Then call the helper in the template:
+
+```gotemplate
+<img src="{{ Asset .HomeImage }}" alt="">
+```
+
+If a field can contain either an external URL or a local asset, keep that choice
+in application code. Do not pass arbitrary public URLs to `Asset`.
+
+OpenGraph images usually need absolute URLs. Build that in the application by
+calling `assets.URL(name)` first and then adding the public origin:
+
+```go
+func publicAssetURL(assets *petra.Assets, origin, name string) (string, error) {
+	p, err := assets.URL(name)
 	if err != nil {
 		return "", err
 	}
-	return publicURL(p), nil
+	return strings.TrimRight(origin, "/") + p, nil
 }
 ```
 
-Then `openGraphImage` can receive either an already-public URL or a local asset name. The app should keep external product links out of this helper.
-
-### stage 4: raw URL cleanup
-
-After migration, run:
+After a migration, search for remaining raw static paths and decide whether each
+one is intentional:
 
 ```sh
-rg '"/static/|/static/' services/web/controllers services/web/cmd/templates
+rg '"/static/|/static/' .
 ```
 
-Every remaining `/static/` should be intentional. Good candidates:
+Good remaining cases include compatibility paths, tests for raw fallback
+behavior, and docs that explain the old URL shape.
 
-- tests that assert raw fallback behavior
-- docs explaining old URLs
-- external compatibility paths, if any
+## test coverage
 
-## tests
+`assets_test.go` covers the implemented contract:
 
-Petra tests should cover URL generation:
+- production URL generation, including `/static/...` input
+- development URL generation
+- development mtime query strings from `DevDir`
+- rejection of empty, escaping, absolute, queried, fragmented, wrong-prefix,
+  missing, and directory asset names
+- raw production serving with `Cache-Control: no-cache`
+- verified hashed production serving with immutable cache headers
+- Brotli serving for hashed CSS when the client accepts it
+- `Vary: Accept-Encoding`
+- mismatched hashes returning `404`
+- conditional requests through `ETag` and `If-None-Match`
+- `HEAD` requests
+- already compressed images, such as WebP, not being Brotli-compressed
+- directory requests not exposing file listings
+- development serving with `Cache-Control: no-store`
 
-- production `URL("app.css")` returns `/static/app-<64 hex>.css`.
-- production `URL("/static/app.css")` returns the same hashed URL.
-- development `URL("app.css")` returns `/static/app.css`.
-- development with `DevDir` returns `/static/app.css?v=<mtime>`.
-- missing asset returns an error.
-- path traversal returns an error.
-- absolute URL returns an error.
+The Tailwind example has tests for production hashed CSS output, hashed asset
+serving, embedded static content, and development `reload_assets` behavior.
 
-Petra tests should cover handler behavior:
+## reference dependency notes
 
-- raw production request returns `200` with `Cache-Control: no-cache`.
-- valid hashed production request returns `200` with `Cache-Control: public, max-age=31536000, immutable`.
-- valid hashed CSS request with `Accept-Encoding: br,gzip` returns `Content-Encoding: br`.
-- valid hashed CSS response keeps `Vary: Accept-Encoding`.
-- `If-None-Match` still produces `304` through `statigz`.
-- mismatched hash returns `404`.
-- directory requests do not list files.
-- `HEAD` works for assets.
-- PNG/WebP are not Brotli-compressed.
+External references checked for the original design:
 
-Application tests should cover:
+- [`hashfs` README at `v0.2.2`](https://github.com/benbjohnson/hashfs/blob/v0.2.2/README.md)
+- [`hashfs.go` at `v0.2.2`](https://github.com/benbjohnson/hashfs/blob/v0.2.2/hashfs.go)
 
-- production HTML contains hashed CSS and JS paths.
-- production HTML does not contain `.AssetVersion` query strings.
-- production HTML contains hashed hero image paths.
-- OpenGraph image URLs are absolute and hashed.
-- the hashed OpenGraph image paths serve `200`.
-- a raw `/static/app.css` still serves `200` with the raw-path cache policy during migration.
+`hashfs.FileServer` is still not used here. Its own implementation removes
+several `http.FileServer` behaviors, and it does not provide Brotli/gzip
+serving. Petra keeps `statigz` so the asset layer keeps startup-time
+compression, encoding negotiation, directory and `index.html` redirects, ETag
+conditional requests, and range support.
 
-## compatibility and failure modes
+Petra uses `hashfs` for naming and validation. `statigz` remains responsible
+for bytes on the wire.
 
-Wrong hashed URL:
+## possible later work
 
-- Return `404`.
-- Do not serve the base file.
-
-Missing asset in template:
-
-- Return a template execution error through the `Asset` function.
-- In development, Petra debug pages should show the template error.
-
-Missing asset requested directly:
-
-- Let the handler return `404`.
-
-Hash calculation failure:
-
-- Return an error from `URL`.
-- Do not silently return a raw path. `hashfs.HashName` returns the original name on read failure, but Petra should wrap it with an existence/read check so template mistakes fail visibly.
-
-Raw URL in production:
-
-- Serve it.
-- Use the raw cache policy.
-- Keep this as a migration and compatibility path.
-
-## implementation notes
-
-Use `fs.Sub` or an internal root adapter so `Assets` hashes names relative to the asset root. The public helper should not expose `static/` as part of the asset name. `fs.Sub` returns the static type `fs.FS`, so the implementation should assert `fs.ReadDirFS` before handing the sub-filesystem to `statigz`.
-
-Normalize with `path`, not `filepath`, because these are URL and `fs.FS` paths.
-
-Preserve query strings only for development URL generation. Production hashed asset URLs should be path-only.
-
-Be careful when rewriting requests before calling `statigz`. Clone the request or restore the original path so outer middleware and logs are not confused.
-
-The handler should set `Cache-Control` before calling the inner static server. `statigz` does not overwrite that header today.
-
-Do not assert exact `ETag` values in new tests unless the test is about `statigz` itself. The encoded and unencoded variants can have different validators.
-
-## docs and examples
-
-Update Petra README with:
-
-- When to use `StaticFS`.
-- When to use `Assets`.
-- Why hashed URLs get immutable caching.
-- Why raw URLs do not.
-- How development differs from production.
-
-Update one example app. The Tailwind example is the best candidate because it already has CSS/JS build output and static development reload.
-
-Add a short note to the plugin reference only if the final API exposes a template helper through `FuncMap`. This is not a plugin; do not force it into the plugin system.
-
-## acceptance criteria
-
-The feature is ready when:
-
-- Existing `StaticFS` tests pass unchanged.
-- `make ci` passes.
-- The new Petra tests prove hashed URLs, cache headers, compression, and invalid-hash behavior.
-- An application can use one `Asset` helper in templates for CSS, JS, icons, and images.
-- Production static assets can be cached for a year only when the request URL contains the verified hash.
-- Direct Go serving keeps Brotli/gzip without adding per-request compression for normal static asset responses.
-
-## later work
-
-Possible later additions:
-
-- A helper for absolute public asset URLs, if multiple apps need OpenGraph-style URLs.
-- A dev handler that combines static watching, no-store headers, and mtime URL generation.
+- A helper for absolute public asset URLs, if multiple apps need
+  OpenGraph-style URLs.
+- A development handler that combines static watching, `no-store` headers, and
+  mtime URL generation.
 - A manifest dump for debugging or CDN preload lists.
-- Short hash display as an option. The first pass should keep `hashfs`'s full 64-character hash to avoid creating another naming contract.
+- Short hash display as an option. The current implementation uses the full
+  `hashfs` hash to avoid creating another naming contract.

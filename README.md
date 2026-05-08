@@ -308,15 +308,16 @@ static := petra.NewStaticWithOptions(petra.StaticOptions{
 defer static.Close()
 ```
 
-Use `StaticFS` for embedded static assets in production. The `stripPrefix`
-argument is also used as the embedded filesystem prefix, so
+Use `StaticFS` for simple embedded static assets in production. The
+`stripPrefix` argument is also used as the embedded filesystem prefix, so
 `StaticFS(webFS, "/static/")` serves requests like `/static/app.css` from
 `static/app.css` inside the embedded filesystem. Pass an empty prefix to serve
 files from the embedded filesystem root.
 
-Use `Assets` when production asset URLs should be safe for long browser caches.
-The helper returns content-hashed URLs in production and raw, readable URLs in
-development:
+Use `Assets` for templates that generate cache-safe asset URLs. Production URLs
+include a SHA-256 content hash in the filename. Development URLs stay readable
+and, when `DevDir` is set, include an mtime query string for local cache
+busting:
 
 ```go
 assets, err := petra.NewAssets(petra.AssetOptions{
@@ -343,10 +344,18 @@ mux.Handle("/static/", assets.Handler())
 <link rel="stylesheet" href="{{ Asset "app.css" }}">
 ```
 
-Verified hashed URLs are served with `Cache-Control: public,
-max-age=31536000, immutable`. Raw production URLs still serve, but use
-revalidation instead of immutable caching. The asset handler keeps Petra's
-startup-time Brotli/gzip compression path.
+In production, `{{ Asset "app.css" }}` returns a path like
+`/static/app-<sha256>.css`. Verified hashed requests are served with
+`Cache-Control: public, max-age=31536000, immutable`. Raw production requests
+such as `/static/app.css` still serve for compatibility, but use
+`Cache-Control: no-cache` because the URL can point at different bytes after a
+deploy. Development responses use `Cache-Control: no-store`.
+
+`Assets.Handler()` keeps Petra's startup-time Brotli/gzip compression path.
+`DevDir` is used only for development URL versioning; it does not make the
+handler serve from disk. If the app also wants development file watching, mount
+`NewStaticWithOptions` in development and `assets.Handler()` in production, as
+shown in `examples/tailwind`.
 
 See `examples/mvcweb` for a small Chi app with controllers, nested Petra templates, hot reload, static assets, and embedded production rendering.
 
@@ -356,5 +365,5 @@ See `examples/mvcweb` for a small Chi app with controllers, nested Petra templat
 - [Plugin trust and cache behavior](docs/reference/plugins.md)
 - [Benchmarks](docs/benchmarks.md)
 - [Selective hot reload spec](docs/design/selective-hot-reload.md)
-- [Hashed static assets proposal](docs/design/hashed-static-assets.md)
+- [Hashed static assets](docs/design/hashed-static-assets.md)
 - [Contributing](CONTRIBUTING.md)
