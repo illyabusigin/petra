@@ -1,0 +1,32 @@
+{{define "content"}}
+<main class="shell">
+  <header class="hero">
+    <div>
+      {{UI.Badge "Component sets" "good"}}
+      <h1>Petra component set example</h1>
+      <p>App templates call a small UI library through the <code>UI</code> namespace while the component source stays namespace-free.</p>
+    </div>
+    <nav class="hero-actions" aria-label="Example actions">
+      {{UI.Link "/summary" "Render Exec partial" "secondary"}}
+      {{UI.Link "https://github.com/illyabusigin/petra" "Petra source"}}
+    </nav>
+  </header>
+
+  <section class="metrics" aria-label="Component set facts">
+    {{range .Metrics}}
+      {{UI.Stat .Label .Value .Detail}}
+    {{end}}
+  </section>
+
+  <section class="notices" aria-label="Implementation notes">
+    {{range .Updates}}
+      {{UI.Notice .Title .Body .Tone}}
+    {{end}}
+  </section>
+
+  <section class="source-map" aria-label="Files to edit">
+    <h2>Try hot reload</h2>
+    <p>Run with <code>go run . -dev</code>, then edit <code>ui/components/core.html</code> or <code>templates/index.html</code>.</p>
+  </section>
+</main>
+{{end}}

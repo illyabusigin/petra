@@ -91,6 +91,7 @@ custom plugin.
 For working apps, start with the focused examples:
 
 - `examples/mvcweb`: Chi, controllers, layouts/components, hot reload, embedded production mode.
+- `examples/component-set`: a small component set package mounted into an app with hot reload for templates and component files.
 - `examples/tailwind`: Tailwind compiled with Vite and served through Petra's asset helper.
 - `examples/debugerrors`: development error pages for broken page and component templates.
 

@@ -11,7 +11,7 @@ STATICCHECK_VERSION ?= latest
 STATICCHECK ?= $(GO) run honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION)
 NPM ?= npm
 PKG ?= ./...
-EXAMPLE_DIRS ?= examples/mvcweb examples/forms examples/tailwind examples/alpine examples/debugerrors examples/htmx-todo
+EXAMPLE_DIRS ?= examples/mvcweb examples/forms examples/tailwind examples/alpine examples/debugerrors examples/htmx-todo examples/component-set
 ASSET_EXAMPLE_DIRS ?= examples/tailwind examples/alpine
 
 .DEFAULT_GOAL := help

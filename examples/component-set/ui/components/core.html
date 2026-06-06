@@ -1,0 +1,26 @@
+{{define "Stat label value detail?"}}
+<article class="ui-stat">
+  <span class="ui-stat-label">{{.label}}</span>
+  <strong class="ui-stat-value">{{.value}}</strong>
+  {{statDetail .detail}}
+</article>
+{{end}}
+
+{{define "Link href label tone?"}}
+<a class="ui-link {{if eq .tone "secondary"}}ui-link-secondary{{else}}ui-link-primary{{end}}" {{attrs "href" .href}}>{{.label}}</a>
+{{end}}
+
+{{define "Badge label tone?"}}
+<span class="ui-badge {{if eq .tone "warm"}}ui-badge-warm{{else if eq .tone "good"}}ui-badge-good{{else}}ui-badge-neutral{{end}}">{{.label}}</span>
+{{end}}
+
+{{define "Notice title body tone?"}}
+<aside class="ui-notice {{if eq .tone "warning"}}ui-notice-warning{{else}}ui-notice-info{{end}}">
+  <h2>{{.title}}</h2>
+  <p>{{.body}}</p>
+</aside>
+{{end}}
+
+{{define "statDetail detail?"}}
+{{if .detail}}<span class="ui-stat-detail">{{.detail}}</span>{{end}}
+{{end}}

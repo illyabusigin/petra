@@ -11,5 +11,6 @@ thing instead of one large application trying to show everything.
 - `forms`: server-rendered GET/POST form flow with validation and re-rendered errors.
 - `debugerrors`: rendered Petra debug pages for broken page and component templates.
 - `htmx-todo`: HTMX partial swaps for a tiny todo app using `go-htmx`.
+- `component-set`: a tiny component set package mounted into an app with dev hot reload for templates and component files.
 
 Each example has its own README and can be run from its folder.
