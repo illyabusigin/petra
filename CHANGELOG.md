@@ -2,6 +2,7 @@
 
 ## v0.0.4 - 2026-06-06
 
+- Updates CI and all Go modules to Go 1.26.4 to pick up the `crypto/x509` fix for GO-2026-5037.
 - Adds `ComponentSet` support for namespace-free component libraries mounted with `petra.Components("UI", set)`.
 - Adds private component-set imports, Go-style public/private visibility by casing, required render plugins, and `Exec` support for mounted component namespaces.
 - Refactors `tmplfunc` to use Go's standard `text/template/parse` package, adds checked dotted-call rewriting, and removes Petra's unused parser fork.

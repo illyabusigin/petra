@@ -103,7 +103,7 @@ func (p componentsPlugin) Apply(*template.Template) error {
 }
 
 func (p componentsPlugin) componentMount() componentMount {
-	return componentMount{namespace: p.namespace, set: p.set}
+	return componentMount(p)
 }
 
 type componentMountProvider interface {

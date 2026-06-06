@@ -1,6 +1,6 @@
 module github.com/illyabusigin/petra/examples/htmx-todo
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/donseba/go-htmx v1.13.1

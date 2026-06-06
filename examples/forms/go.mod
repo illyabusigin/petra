@@ -1,6 +1,6 @@
 module github.com/illyabusigin/petra/examples/forms
 
-go 1.26.3
+go 1.26.4
 
 require github.com/illyabusigin/petra v0.0.0
 
