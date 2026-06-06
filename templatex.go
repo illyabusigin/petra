@@ -241,8 +241,8 @@ func (t *Template) Exec(w io.Writer, tmplt string, data any) error {
 		}, err)
 	}
 
-	clone, err = clone.New(tmplt).Parse(tmplt)
-	if err != nil {
+	inline := clone.New(tmplt)
+	if err := tmplfunc.Parse(inline, tmplt); err != nil {
 		return newDebugError(DebugErrorInfo{
 			Kind:           DebugErrorKindParse,
 			Operation:      "Exec",
@@ -251,17 +251,7 @@ func (t *Template) Exec(w io.Writer, tmplt string, data any) error {
 		}, err)
 	}
 
-	err = tmplfunc.Funcs(clone)
-	if err != nil {
-		return newDebugError(DebugErrorInfo{
-			Kind:           DebugErrorKindParse,
-			Operation:      "Exec",
-			DependencyRole: DebugDependencyRoleInline,
-			Path:           "inline",
-		}, err)
-	}
-
-	if err := clone.Execute(w, data); err != nil {
+	if err := inline.Execute(w, data); err != nil {
 		return newDebugError(DebugErrorInfo{
 			Kind:           DebugErrorKindExecute,
 			Operation:      "Exec",
@@ -333,13 +323,33 @@ func (t *Template) logEnabled(level slog.Level) bool {
 }
 
 func buildFuncMap(tmplt *template.Template, funcMap template.FuncMap, plugins Plugins) (*template.Template, error) {
+	componentMounts := collectComponentMounts(plugins)
+	requiredPlugins, err := collectComponentRequiredPlugins(componentMounts)
+	if err != nil {
+		return nil, err
+	}
+
 	m := template.FuncMap{}
 	for key, f := range funcMap {
 		m[key] = f
 	}
 
-	// Build funcs for template
+	for _, p := range requiredPlugins {
+		funcs, err := p.Funcs()
+		if err != nil {
+			return nil, err
+		}
+
+		for key, f := range funcs {
+			m[key] = f
+		}
+	}
+
 	for _, p := range plugins {
+		if _, ok := p.(componentMountProvider); ok {
+			continue
+		}
+
 		funcs, err := p.Funcs()
 		if err != nil {
 			return nil, err
@@ -352,10 +362,24 @@ func buildFuncMap(tmplt *template.Template, funcMap template.FuncMap, plugins Pl
 
 	populated := tmplt.Funcs(m)
 
-	for _, p := range plugins {
+	for _, p := range requiredPlugins {
 		if err := p.Apply(populated); err != nil {
 			return nil, err
 		}
+	}
+
+	for _, p := range plugins {
+		if _, ok := p.(componentMountProvider); ok {
+			continue
+		}
+
+		if err := p.Apply(populated); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := applyComponentMounts(populated, componentMounts); err != nil {
+		return nil, err
 	}
 
 	return populated, nil
@@ -502,8 +526,7 @@ func parsePage(files fs.FS, info templateInfo, layout string, funcMap template.F
 	}
 
 	// Parse the rest of the templates
-	t, err = t.ParseFS(files, info.files...)
-	if err != nil {
+	if err := tmplfunc.ParseAssociatedFilesFS(t, files, info.files...); err != nil {
 		wrapped := newDebugErrorWithSource(files, info.files, DebugErrorInfo{
 			Kind:      DebugErrorKindParse,
 			Operation: "parse page",
