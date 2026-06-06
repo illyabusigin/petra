@@ -11,32 +11,109 @@ This page describes the contract Petra currently follows.
 
 For each new template set, Petra does this:
 
-1. Copy `Template.FuncMap` into a new function map.
-2. Call each plugin's `Funcs()` method in the order listed in
+1. Collect `Components(namespace, set)` mounts and the render plugins required
+   by those sets.
+2. Copy `Template.FuncMap` into a new function map.
+3. Add functions from required component-set plugins.
+4. Add functions from non-component plugins in the order listed in
    `Template.Plugins`.
-3. Add the returned plugin functions to the function map.
-4. Attach the combined function map to the Go template.
-5. Call each plugin's `Apply()` method in the same plugin order.
-6. Parse the page, layout, and component templates.
+5. Attach the combined function map to the Go template.
+6. Apply required component-set plugins.
+7. Apply non-component plugins in `Template.Plugins` order.
+8. Compile mounted component sets and their private imports.
+9. Parse the page, layout, and app component templates.
 
 `ParseDir`, `ParseFS`, and successful reloads all build a new template set.
 They do not mutate the active parsed templates in place.
 
 ## Function name collisions
 
-Plugin functions override same-named functions from `Template.FuncMap`.
+Component-set requirements override same-named functions from
+`Template.FuncMap`.
 
-If two plugins return the same function name, the later plugin in
-`Template.Plugins` wins. Keep plugin order explicit when names overlap.
+Explicit plugin functions override required component-set functions. If two
+explicit plugins return the same function name, the later plugin in
+`Template.Plugins` wins.
+
+Keep plugin order explicit when names overlap.
 
 The built-in plugins use these names:
 
 - `HTML()` adds `attrs`, `html`, and `js`.
 - `Markdown()` adds `MarkdownToHTML` and the callable `{{Markdown}}` helper.
 - `SVG()` adds the callable `{{SVG}}` helper.
+- `Components(namespace, set)` mounts exported templates from a `ComponentSet`.
 
 The `_loadMarkdown` and `_loadSVG` functions are implementation details used by
 the helper templates. Do not call them from application templates.
+
+## Component sets
+
+`NewComponentSet(id, files, root, opts...)` describes a reusable component
+library. `Components(namespace, set)` mounts that library into an app.
+
+Definitions inside a component set are namespace-free:
+
+```gotemplate
+{{define "TextField name label id attrs error?"}}
+  <label for="{{.id}}">{{.label}}</label>
+  <input id="{{.id}}" name="{{.name}}"{{range $k, $v := .attrs}} {{attrs $k $v}}{{end}}>
+  {{if .error}}<span class="error">{{.error}}</span>{{end}}
+{{end}}
+```
+
+The app chooses the public namespace:
+
+```go
+ui := petra.NewComponentSet(
+	"github.com/acme/petra-ui",
+	uiFS,
+	"components",
+	petra.Requires(petra.HTML()),
+)
+
+tmpl := petra.NewWithOptions(petra.Options{
+	Plugins: petra.Plugins{
+		petra.Components("UI", ui),
+	},
+})
+```
+
+Application templates call exported definitions through the mounted namespace:
+
+```gotemplate
+{{UI.TextField "email" "Email" "email" (dict "type" "email") .Errors.Email}}
+```
+
+Export uses Go's casing rule. `TextField` is public. `fieldLabel` and
+`_fieldLabel` are private.
+
+A set can privately import another set:
+
+```go
+base := petra.NewComponentSet("github.com/acme/petra-base", baseFS, "components")
+kit := petra.NewComponentSet(
+	"github.com/acme/petra-kit",
+	kitFS,
+	"components",
+	petra.Import("Base", base),
+)
+```
+
+Templates in `kit` can call `{{Base.Button "Save"}}` if `Button` is exported by
+`base`. The app does not get a `Base` namespace unless it mounts `base` too.
+
+Use a live filesystem such as `os.DirFS` while developing a library. Add both
+the application template folder and the library folder to `HotReloadOptions`.
+Changes outside the application template root trigger a full template reparse,
+so external component-set edits update cleanly even though Petra's selective
+dependency graph remains app-template-root based.
+
+`Requires` is for server-side render plugins only. Component sets do not manage
+client assets, JavaScript imports, CSS files, or model types in v1.
+
+See [component set architecture](../architecture/component-sets.md) for the
+parse pipeline, privacy rules, and package shape.
 
 ## Cache lifetime
 
