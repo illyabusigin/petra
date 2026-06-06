@@ -28,6 +28,8 @@ var tests = []struct {
 	{`{{define "hello who?"}}hello {{.who}}{{end}}{{hello "world"}}`, "hello world"},
 	{`{{define "hello who..."}}hello {{.who}}{{end}}{{hello}}`, "hello []"},
 	{`{{define "hello who..."}}hello {{.who}}{{end}}{{hello "world"}}`, "hello [world]"},
+	{`{{define "UI.TextField name label type attrs error?"}}<label>{{.label}}<input name="{{.name}}" type="{{.type}}"></label>{{if .error}}<span>{{.error}}</span>{{end}}{{end}}{{UI.TextField "email" "Email" "email" nil "required"}}`, `<label>Email<input name="email" type="email"></label><span>required</span>`},
+	{`{{define "UI.Label text"}}<label>{{.text}}</label>{{end}}{{define "UI.Field text"}}{{UI.Label .text}}<input>{{end}}{{UI.Field "Email"}}`, `<label>Email</label><input>`},
 }
 
 func TestText(t *testing.T) {
@@ -107,5 +109,38 @@ func TestFuncs(t *testing.T) {
 		// Happens if you forget to call Funcs above:
 		//	cannot Clone "" after it has executed
 		t.Fatal(err)
+	}
+}
+
+func TestNamespacedComponentPreservesUnknownFunctionParseErrors(t *testing.T) {
+	tmpl := htmltemplate.New("")
+	err := Parse(tmpl, `{{define "UI.Text"}}text{{end}}{{missingFunc}}`)
+	if err == nil {
+		t.Fatal("Parse() error = nil")
+	}
+	if !strings.Contains(err.Error(), `function "missingFunc" not defined`) {
+		t.Fatalf("Parse() error = %v", err)
+	}
+}
+
+func TestNamespacedComponentRejectsMissingMember(t *testing.T) {
+	tmpl := htmltemplate.New("")
+	err := Parse(tmpl, `{{define "UI.Text"}}text{{end}}{{UI.Missing}}`)
+	if err == nil {
+		t.Fatal("Parse() error = nil")
+	}
+	if !strings.Contains(err.Error(), `function "UI.Missing" not defined`) {
+		t.Fatalf("Parse() error = %v", err)
+	}
+}
+
+func TestNamespacedComponentRejectsRootCall(t *testing.T) {
+	tmpl := htmltemplate.New("")
+	err := Parse(tmpl, `{{define "UI.Text"}}text{{end}}{{UI}}`)
+	if err == nil {
+		t.Fatal("Parse() error = nil")
+	}
+	if !strings.Contains(err.Error(), `function "UI" not defined`) {
+		t.Fatalf("Parse() error = %v", err)
 	}
 }

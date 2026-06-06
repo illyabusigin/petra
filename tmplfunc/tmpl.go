@@ -84,9 +84,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-
-	htmltemplate "html/template"
-	texttemplate "text/template"
 )
 
 // A Template is a *template.Template, where template refers to either
@@ -101,17 +98,7 @@ type Template interface {
 
 // Parse is like t.Parse(text), adding functions for the templates defined in text.
 func Parse(t Template, text string) error {
-	if err := funcs(t, []string{t.Name()}, []string{text}); err != nil {
-		return err
-	}
-	var err error
-	switch t := t.(type) {
-	case *texttemplate.Template:
-		_, err = t.Parse(text)
-	case *htmltemplate.Template:
-		_, err = t.Parse(text)
-	}
-	return err
+	return parseIntoTemplate(t, []string{t.Name()}, []string{text})
 }
 
 // ParseFiles is like t.ParseFiles(filenames...), adding functions for the parsed templates.
@@ -122,6 +109,14 @@ func ParseFiles(t Template, filenames ...string) error {
 // ParseFilesFS is like t.ParseFiles(filenames...), adding functions for the parsed templates.
 func ParseFilesFS(t Template, fsys fs.FS, filenames ...string) error {
 	return parseFiles(t, readFileFS(fsys), filenames...)
+}
+
+// ParseAssociatedFilesFS is like t.ParseFS for templates associated with t.
+// It allows those templates to call tmplfunc-generated functions already
+// installed on t, including namespaced functions such as UI.TextField, but it
+// does not install new functions for templates defined by filenames.
+func ParseAssociatedFilesFS(t Template, fsys fs.FS, filenames ...string) error {
+	return parseAssociatedFiles(t, readFileFS(fsys), filenames...)
 }
 
 // parseFiles is the helper for the method and function. If the argument
@@ -143,40 +138,26 @@ func parseFiles(t Template, readFile func(string) (string, []byte, error), filen
 		texts = append(texts, string(b))
 	}
 
-	err := funcs(t, names, texts)
-	if err != nil {
-		return err
+	return parseIntoTemplate(t, names, texts)
+}
+
+func parseAssociatedFiles(t Template, readFile func(string) (string, []byte, error), filenames ...string) error {
+	if len(filenames) == 0 {
+		return fmt.Errorf("tmplfunc: no files named in call to ParseAssociatedFiles")
 	}
 
-	switch t := t.(type) {
-	case *texttemplate.Template:
-		for i, name := range names {
-			var tmpl *texttemplate.Template
-			if name == t.Name() {
-				tmpl = t
-			} else {
-				tmpl = t.New(name)
-			}
-			if _, err := tmpl.Parse(texts[i]); err != nil {
-				return err
-			}
+	var names []string
+	var texts []string
+	for _, filename := range filenames {
+		name, b, err := readFile(filename)
+		if err != nil {
+			return err
 		}
-
-	case *htmltemplate.Template:
-		for i, name := range names {
-			var tmpl *htmltemplate.Template
-			if name == t.Name() {
-				tmpl = t
-			} else {
-				tmpl = t.New(name)
-			}
-			if _, err := tmpl.Parse(texts[i]); err != nil {
-				return err
-			}
-		}
+		names = append(names, name)
+		texts = append(texts, string(b))
 	}
 
-	return nil
+	return parseAssociatedIntoTemplate(t, names, texts)
 }
 
 // ParseGlob is like t.ParseGlob(pattern), adding functions for the parsed templates.
